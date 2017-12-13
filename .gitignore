@@ -1,0 +1,11 @@
+*.pyc
+/ENV
+
+*.komodoproject
+*.vscode/
+
+*.egg-info/
+build/
+dist/
+*.gdb/
+*.mxd
