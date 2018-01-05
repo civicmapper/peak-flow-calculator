@@ -8,7 +8,8 @@ setup(
     install_requires=[
         'click',
         'numpy',
-        'petl'
+        'petl',
+        'pint'
     ],
     entry_points='''
         [console_scripts]
