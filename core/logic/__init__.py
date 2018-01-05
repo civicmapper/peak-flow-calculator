@@ -28,57 +28,48 @@ This information is then associated with the inlet/culvert of each
 catchment_area
 """
 
+# -----------------------------------------------------------------------------
+# IMPORTS
+#
+
 # standard library imports
 import os
 
 # dependencies
-from arcpy import AddMessage, AddWarning, AddError, Describe
+from arcpy import AddMessage, AddWarning, AddError, Describe, ListEnvironments, Raster
 from arcpy import CopyFeatures_management, JoinField_management
-
-# 3rd party dependencies
-# (not included with Esri ArcMap; attempt to install when not available)
-try:
-    import petl as etl
-except:
-    print("This tool requires Python PETL (https://pypi.python.org/pypi/petl).\nIf you've previously installed it but are seeing this message, you may need to restart your python interpreter.")
-    from pkg_resources import WorkingSet , DistributionNotFound
-    working_set = WorkingSet()
-    try:
-        dep = working_set.require('petl>=1.1')
-    except DistributionNotFound:
-        print("...installing...")
-        try:
-            from setuptools.command.easy_install import main as install
-            install(['petl>=1.1'])
-        except:
-            print("This tool was unable to find or install the required dependencies.")
-            exit
-
-try:
-    import click
-except:
-    print("This tool requires Python Click (https://pypi.python.org/pypi/click).\nIf you've previously installed it but are seeing this message, you may need to restart your python interpreter.")
-    from pkg_resources import WorkingSet , DistributionNotFound
-    working_set = WorkingSet()
-    try:
-        dep = working_set.require('click>=6')
-    except DistributionNotFound:
-        print("...installing...")
-        try:
-            from setuptools.command.easy_install import main as install
-            install(['click>=6'])
-        except:
-            print("This tool was unable to find or install the required dependencies.")
-            exit
+from arcpy import env
 
 # application imports
 from data_io import precip_table_etl_noaa
 from gp import prep_cn_raster, load_csv, join_to_copy, derive_data_from_catchments, catchment_delineation
 from calc import calculate_tc, calculate_peak_flow
-from utils import so, msg
+from utils import so, msg, attempt_pkg_install
+
+# add'l dependencies, not included with ArcMap's Python installtion;
+# this is here in case user hasn't attempted `pip install -r requirements.txt`
+try:
+    import petl as etl
+except:
+    attempt_pkg_import('petl>=1.1')
+try:    
+    import click
+except:
+    attempt_pkg_import('click>=6')
+try:
+    import pint
+except:
+    attempt_pkg_import('pint>=0.8.1')
+
 
 # -----------------------------------------------------------------------------
-# Primary workflow
+# Globals
+# 
+
+units = pint.UnitRegistry()
+
+# -----------------------------------------------------------------------------
+# Application controller
 #
 
 def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, output, output_catchments=None, pour_point_field=None, input_watershed_raster=None, area_conv_factor=0.00000009290304):
@@ -114,10 +105,38 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
 
     """
 
+    msg('Setting environment parameters...')
+    env_raster = Raster(flow_dir_raster)
+    env.snapRaster = env_raster
+    env.cellSize = (env_raster.meanCellHeight + env_raster.meanCellWidth) / 2.0
+    env.extent = env_raster.extent
+    for i in ListEnvironments():
+        msg("\t%-24s: %s" % (i, env[i]))
+
+    msg('Determing linear units of reference raster dataset...')
+    # get the name of the linear unit from env_raster
+    unit_name = env_raster.spatialReference.linearUnitName
+    f = None
+    # attempt to auto-dectect unit names for use with the Pint package
+    if unit_name:
+        if 'foot'.upper() in unit_name.upper():
+            f = 1 * units.square_foot
+            msg("...auto-detected 'feet' from the source data")
+        elif 'meter'.upper() in unit_name.upper():
+            f = 1 * (units.meter ** 2)
+            msg("...auto-detected 'meters' from the source data")
+        else:
+            msg("Could not determine conversion factor for '{0}'".format(unit_name))
+    else:
+        msg("Reference raster dataset has no spatial reference information.")
+    if f:
+        area_conv_factor = f.to(units.kilometer ** 2).magnitude
+    msg("Area conversion factor: {0}".format(area_conv_factor))
+
+
     msg('Loading precipitation table...')
     precip_tab = precip_table_etl_noaa(precip_table=precip_table_noaa)
     precip_tab_1d = precip_tab[0]
-
     
     msg('Prepping inlets...')
     CopyFeatures_management(

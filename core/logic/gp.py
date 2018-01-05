@@ -151,6 +151,7 @@ def catchment_delineation(inlets, flow_direction_raster, pour_point_field):
             "count": <count (int) of the number of inlets/catchments>
             }
     """
+
     # delineate the watershed(s) for the inlets. This is the standard spatial analyst watershed function
     catchments = Watershed(
         in_flow_direction_raster=flow_direction_raster,
@@ -160,6 +161,7 @@ def catchment_delineation(inlets, flow_direction_raster, pour_point_field):
     # save the catchments layer to the fgdb set by the arcpy.env.scratchgdb setting)
     catchments_save = so("catchments","timestamp","fgdb")
     catchments.save(catchments_save)
+    msg("catchments raster saved: {0}".format(catchments_save))
     # get count of how many watersheds we should have gotten (# of inlets)
     count = int(GetCount_management(inlets).getOutput(0))
     # return a dictionary containing ref. to the scratch catchments layer and the count of catchments
