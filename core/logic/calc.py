@@ -13,19 +13,25 @@ import petl as etl
 
 from utils import msg
 
-def calculate_tc(max_flow_length, mean_slope):
+def calculate_tc(
+    max_flow_length, 
+    mean_slope, 
+    const_a=0.000325, 
+    const_b=0.77, 
+    const_c=-0.385
+):
     """
     calculate time of concentration (hourly)
 
     Inputs:
         - max_flow_length: maximum flow length of a catchment area, derived
             from the DEM for the catchment area
-        - mean_slope: average slope, from the DEM for the catchment area
+        - mean_slope: average slope, from the DEM *for just the catchment area*
 
     Outputs:
         tc_hr: time of concentration (hourly)
     """
-    tc_hr = 0.000325 * math.pow(max_flow_length, 0.77) * math.pow((mean_slope / 100), -0.385)
+    tc_hr = const_a * math.pow(max_flow_length, const_b) * math.pow((mean_slope / 100), const_c)
     return tc_hr
 
 def calculate_peak_flow(

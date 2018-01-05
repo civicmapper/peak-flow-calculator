@@ -40,7 +40,7 @@ from arcpy import CopyFeatures_management, JoinField_management
 try:
     import petl as etl
 except:
-    print("This tool requires Python PETL (https://pypi.python.org/pypi/petl).\nIf you've previously installed it but are seeing this message, you made need to restart your python interpreter.")
+    print("This tool requires Python PETL (https://pypi.python.org/pypi/petl).\nIf you've previously installed it but are seeing this message, you may need to restart your python interpreter.")
     from pkg_resources import WorkingSet , DistributionNotFound
     working_set = WorkingSet()
     try:
@@ -57,7 +57,7 @@ except:
 try:
     import click
 except:
-    print("This tool requires Python Click (https://pypi.python.org/pypi/click).\nIf you've previously installed it but are seeing this message, you made need to restart your python interpreter.")
+    print("This tool requires Python Click (https://pypi.python.org/pypi/click).\nIf you've previously installed it but are seeing this message, you may need to restart your python interpreter.")
     from pkg_resources import WorkingSet , DistributionNotFound
     working_set = WorkingSet()
     try:
@@ -71,6 +71,7 @@ except:
             print("This tool was unable to find or install the required dependencies.")
             exit
 
+# application imports
 from data_io import precip_table_etl_noaa
 from gp import prep_cn_raster, load_csv, join_to_copy, derive_data_from_catchments, catchment_delineation
 from calc import calculate_tc, calculate_peak_flow
@@ -80,21 +81,37 @@ from utils import so, msg
 # Primary workflow
 #
 
-def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, output, output_catchments=None, pour_point_field=None,area_conv_factor=0.00000009290304):
-    """
-    Peak flow calculation function
+def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, output, output_catchments=None, pour_point_field=None, input_watershed_raster=None, area_conv_factor=0.00000009290304):
+    """Main controller for running the drainage/peak-flow calculator with geospatial data
+    
+    Arguments:
+        inlets {point feature layer} -- point features representing 
+            inlets/catchbasins (i.e., point at which peak flow is being assessed)
+        flow_dir_raster {raster layer} -- flow direction raster, derived from 
+            a user-corrected DEM for an entire study area
+        slope_raster {raster layer} -- a slope raster, derived from an 
+            *un-corrected* DEM for an entire study area
+        cn_raster {raster layer} -- Curve Number raster, derived using 
+            prep_cn_raster() tool
+        precip_table_noaa {path to csv} -- preciptation table from NOAA (csv)
+        output {path for new point feature class} -- output point features; this is 
+            a copy of the original inlets, with peak flow calculations appended
+    
+    Keyword Arguments:
+        pour_point_field {field name} -- <optional> name of field containing unique IDs for
+            the inlets feature class. Uses the OID/FID/GUID field (default: {None})
+        input_watershed_raster {raster layer} -- <optional> , pre-calculated watershed 
+            raster for the study area. If used, the values in each catchment must 
+            correspond to values in the *pour_point_field* for the *inlets* (default: {None})
+        area_conv_factor {float} -- <optional>  (default: 0.00000009290304)
+        output_catchments {path for new polygon feature class} -- <optional>  output polygon 
+            features; this is a vectorized version of the delineated watershed(s), with peak flow 
+            calculations appended (default: {None})
 
-    Inputs:
-        - inlets: point features representing inlets/catchbasins (i.e., point 
-            at which peak flow is being assessed)
-        - pour_point_field: unique ID field in the inlets feature class
-        - flow_dir_raster: flow direction raster, derived from user-corrected DEM
-        - slope_raster: slope raster, *derived from non-corrected DEM one time 
-            for entire study area*
-        - cn_raster: Curve Number raster, derived using prep_cn_raster() tool
-        - precip_table_noaa: preciptation table from NOAA (csv)
-        - output: output point features; this is a copy of the original inlets, 
-            with peak flow calculations
+    Returns:
+        a tuple of two paths (strings): [0] = path to the output points and, if 
+            specified, [1] = path to the output_catchments
+
     """
 
     msg('Loading precipitation table...')
@@ -115,13 +132,16 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
             pour_point_field = i.OIDFieldName
         # AddGlobalIDs_management(in_datasets="Inlet_Move10")
 
-    msg('Delineating catchments from inlets...')
-    catchment_results = catchment_delineation(
-        inlets=inlets_copy,
-        flow_direction_raster=flow_dir_raster,
-        pour_point_field=pour_point_field
-    )
-    catchment_areas = catchment_results['catchments']
+    if not input_watershed_raster:
+        msg('Delineating catchments from inlets...')
+        catchment_results = catchment_delineation(
+            inlets=inlets_copy,
+            flow_direction_raster=flow_dir_raster,
+            pour_point_field=pour_point_field
+        )
+        catchment_areas = catchment_results['catchments']
+    else:
+        catchment_areas = input_watershed_raster
 
     msg('Deriving calculation parameters for catchments...')
     catchment_params = derive_data_from_catchments(

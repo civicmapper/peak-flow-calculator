@@ -133,8 +133,8 @@ def derive_from_dem(dem):
         "slope_raster": Raster(slope_raster),
     }
 
-def catchment_delineation(inlets, flow_direction_raster, pour_point_field="OBJECTID"):
-    """
+def catchment_delineation(inlets, flow_direction_raster, pour_point_field):
+    """    
     Delineate the catchment area(s) for the inlet(s). Also provide back how many
     catchments we're dealing with so we can handle iteration accordingly.
     
@@ -151,16 +151,18 @@ def catchment_delineation(inlets, flow_direction_raster, pour_point_field="OBJEC
             "count": <count (int) of the number of inlets/catchments>
             }
     """
-    # get the ID field name
-    # delineate watershed
+    # delineate the watershed(s) for the inlets. This is the standard spatial analyst watershed function
     catchments = Watershed(
-        in_flow_direction_raster=flow_direction_raster, 
+        in_flow_direction_raster=flow_direction_raster,
         in_pour_point_data=inlets,
         pour_point_field=pour_point_field
     )
-    # get count of how many to return with output
+    # save the catchments layer to the fgdb set by the arcpy.env.scratchgdb setting)
+    catchments_save = so("catchments","timestamp","fgdb")
+    catchments.save(catchments_save)
+    # get count of how many watersheds we should have gotten (# of inlets)
     count = int(GetCount_management(inlets).getOutput(0))
-    # generate a list of ids from the catchment raster. this 
+    # return a dictionary containing ref. to the scratch catchments layer and the count of catchments
     return {"catchments": catchments, "count": count}
 
 def derive_data_from_catchments(
@@ -233,7 +235,7 @@ def derive_data_from_catchments(
             else:
                 results[this_id] = {"max_fl": fl_max}
 
-    # calculate average slope within each catchment for all catchments
+    # calculate average curve number within each catchment for all catchments
     table_cns = so("cn_zs_table","timestamp","fgdb")
     msg("CN Table: {0}".format(table_cns))
     ZonalStatisticsAsTable(catchment_areas, raster_field, curve_number_raster, table_cns, "DATA", "MEAN")
@@ -247,7 +249,7 @@ def derive_data_from_catchments(
             else:
                 results[this_id] = {"avg_cn": this_area}
     
-    # calculate average curve number within each catchment for all catchments
+    # calculate average slope within each catchment for all catchments
     table_slopes = so("slopes_zs_table","timestamp","fgdb")
     msg("Slopes Table: {0}".format(table_slopes))
     ZonalStatisticsAsTable(catchment_areas, raster_field, slope_raster, table_slopes, "DATA", "MEAN")
@@ -296,7 +298,7 @@ def derive_data_from_catchments(
         records.append(record)
     
     if out_catchment_polygons:
-        return records, out_catchment_polygons
+        return records, cp
     else:
         return records, None
 

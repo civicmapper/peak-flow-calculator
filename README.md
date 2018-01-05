@@ -1,42 +1,36 @@
-# Culvert & Drainage Evaluation Models
+# Peak Flow Calculator
 
-This software is used for evaluating runoff during storm events over known drainages.
+This software is used for calculating peak flow at given points (typically, inlets/catch basins) over a hydrologically-corrected DEM
 
-This project encompasses work originally developed by the [Cornell Soil & Water Lab](http://soilandwater.bee.cornell.edu/) (see Credits/Contributors, below). Enhancements and extensions are being developed by the teams at [CivicMapper](http://www.civicmapper.com) and [Spatial Analytix](http://www.spatialanalytixllc.com) in consultation with the Cornell Soil & Water Lab.
+This project encompasses work originally developed by the [Cornell Soil & Water Lab](http://soilandwater.bee.cornell.edu/) (see Credits/Contributors, below). The CLI and ArcGIS toolbox adaptation are by the teams at [CivicMapper](http://www.civicmapper.com) and [Spatial Analytix](http://www.spatialanalytixllc.com).
 
 # Capabilities
 
-In summary, this set of models will:
-
-1. Determine the runoff peak discharge of given culvert's watershed using the SCS graphical curve number method.
-2. Calculate the cross sectional area of each culvert and assign c and Y coefficients based on culvert characteristics
-3. Determine the maximum capacity of a culvert using inlet control
-4. Determine the maximum return period storm that the culvert can safely pass before overtopping for both current and future rainfall conditions.
+In summary, this toolset will determine the runoff peak discharge of given point's watershed using the SCS graphical curve number method.
 
 ## Inputs:
 
-For each evaluation area (e.g., a county, a watershed, or other geography), the model requires:
-
-1. Culvert Watershed data input: A CSV file containing data on culvert watershed characteristics including Culvert IDs, WS_area in sq km, Tc in hrs and CN
-2. NRCC export CSV file of precipitation data (in) for the 1, 2, 5, 10, 25, 50, 100, 200 and 500 yr 24-hr storm events. Check that the precipitation from the 1-yr, 24 hr storm event is in cell K-11
-3. Field data collection input: A CSV file containing culvert data gathered in the field using either then NAACC data colleciton format or Tompkins county Fulcrum app
+(TBC)
 
 ## Outputs:
 
-The model produces five intermediate and one final output table:
-
-1. Culvert geometry file: A CSV file containing culvert dimensions and assigned c and Y coefficients
-2. Capacity output: A CSV file containing the maximum capacity of each culvert under inlet control
-3. Current Runoff output: A CSV file containing the peak discharge for each culvert's watershed for the analyzed return period storms under current rainfall conditions
-4. Future Runoff output: A CSV file containing the peak discharge for each culvert's watershed for the analyzed return period storms under 2050 projected rainfall conditions
-5. Return periods output: A CSV file containing the maximum return period that each culvert can safely pass under current rainfall conditions and 2050 projections.
-6. Final Model ouptut: A CSV file that summarizes the above model outputs in one table
-    
-# Installation and Usage
-
-This project relies upon the Python [Click](http://click.pocoo.org/) package for a simple, cross-platform, command line-based interface to the models.
-
 (TBC)
+    
+# Installation
+
+*...when the only time you interact with Python is tangentialy through ArcMap*
+
+Since this calculator requires some third party libraries available on [`pypi`](https://pypi.python.org/pypi) as well as [`arcpy`](http://desktop.arcgis.com/en/arcmap/latest/analyze/arcpy/what-is-arcpy-.htm) (not available on [`pypi`](https://pypi.python.org/pypi)`), we need to install those dependencies in ArcMap's python installation. This shouldn't be a big deal, since ArcMap versions after 10.2 seem to configure the necessary environment variables for Python to work correctly for Windows.
+
+1. Open up a command line interface. You can use `cmd.exe`.
+    * Note: Powershell can get funky with Python virtual environments, which can make this more difficult than necessary. In general I highly recommend [cmder](http://cmder.net/) for a useful command line tool on Windows
+1. run `cd C:\path\to\your\copy\of\peak-flow-calc` to put you into this folder. Running `dir` will list files in that directory; you should see `setup.py`.
+1. run `python -m setup.py` to install the third party dependencies and register them with the Python installation that ArcMap uses. 
+    * Depending on how Python was installed on your machine, the `python` portion of that command may or may not work (e.g., in some cases `python` gets taken by another Python installation). 
+    * Since ArcMap uses Python 2.7.x, you may find that `py -2 -m setup.py` is what you need to run&mdash;that may be the case if you've gone and installed Python 3 using an official Python installer for Windows from [python.org](https://www.python.org/).
+    * if you get an error that `python` can't be found/command is not recognized, then Python hasn't been set as an environment variable for Windows. See [this documentation](https://docs.python.org/2/using/windows.html#excursus-setting-environment-variables) for instructions on how to do that.
+
+*note: in the future, when we start using ArcGIS Pro, we should be able to avoid this as that program and its version of `arcpy` use `conda`, a python package manager that works with `pypi`*
 
 # Contributions
 
@@ -54,3 +48,5 @@ This project relies upon the Python [Click](http://click.pocoo.org/) package for
 * Object-oriented structure and resiliency updates built by Noah Warnke, August 31 2016 (no formulas changed).
 * Updated by Zoya Kaufmann June 2016 - August 2017
 * Merged with older versions by Tanvi Naidu June 19 2017
+* CLI developed by Christian Gass @ CivicMapper, Fall 2017
+* ArcGIS toolbox interface developed by Christian Gass @ CivicMapper, Fall 2017
