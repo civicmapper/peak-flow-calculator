@@ -82,3 +82,20 @@ def so(prefix, suffix="random", where="fgdb"):
         )
     else:
         return os.path.join(location,"{0}_{1}".format(prefix,suffix))
+
+# 3rd party dependencies
+# (not included with Esri ArcMap; attempt to install when not available)
+
+def attempt_pkg_install(pkg):
+    msg("This tool requires the {0} package to be installed. Attempting installation...".format(pkg))
+    from pkg_resources import WorkingSet , DistributionNotFound
+    working_set = WorkingSet()
+    try:
+        dep = working_set.require(pkg)
+    except DistributionNotFound:
+        try:
+            from setuptools.command.easy_install import main as install
+            install([pkg])
+        except:
+            msg("This tool was unable to find or install a required dependency: {0}".format(pkg))
+            exit
