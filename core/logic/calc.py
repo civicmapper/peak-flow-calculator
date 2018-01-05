@@ -69,7 +69,7 @@ def calculate_peak_flow(
     
     # Skip calculation altogether if curve number or time of concentration are 0.
     # (this indicates invalid data)
-    if cn == 0 or tc == 0:
+    if cn in [0,'',None] or tc in [0,'',None]:
         qp_data = [0 for i in range(0,len(qp_header))]#,Qp[8]]
         return OrderedDict(zip(qp_header,qp_data))
     
