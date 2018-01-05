@@ -9,3 +9,5 @@ build/
 dist/
 *.gdb/
 *.mxd
+
+.ipynb_checkpoints/
