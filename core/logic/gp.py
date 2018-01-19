@@ -15,7 +15,7 @@ from arcpy.da import SearchCursor
 from arcpy import env
 
 # this package
-from utils import so, msg
+from utils import so, msg, clean
 
 # ----------------------------------------------------------------------------
 # HELPERS
@@ -161,7 +161,7 @@ def catchment_delineation(inlets, flow_direction_raster, pour_point_field):
     # save the catchments layer to the fgdb set by the arcpy.env.scratchgdb setting)
     catchments_save = so("catchments","timestamp","fgdb")
     catchments.save(catchments_save)
-    msg("catchments raster saved: {0}".format(catchments_save))
+    msg("...catchments raster saved:\n\t{0}".format(catchments_save))
     # get count of how many watersheds we should have gotten (# of inlets)
     count = int(GetCount_management(inlets).getOutput(0))
     # return a dictionary containing ref. to the scratch catchments layer and the count of catchments
@@ -173,6 +173,7 @@ def derive_data_from_catchments(
     slope_raster,
     curve_number_raster,
     area_conv_factor=0.00000009290304,
+    length_conv_factor=1,
     out_catchment_polygons=None
     ):
     """
@@ -231,11 +232,12 @@ def derive_data_from_catchments(
                 catchment_areas,
                 this_id,
                 flow_direction_raster
+                length_conv_factor
             )
             if this_id in results.keys():
-                results[this_id]["max_fl"] = fl_max
+                results[this_id]["max_fl"] = clean(fl_max)
             else:
-                results[this_id] = {"max_fl": fl_max}
+                results[this_id] = {"max_fl": clean(fl_max)}
 
     # calculate average curve number within each catchment for all catchments
     table_cns = so("cn_zs_table","timestamp","fgdb")
@@ -247,9 +249,9 @@ def derive_data_from_catchments(
             this_id = r[0]
             this_area = r[1]
             if this_id in results.keys():
-                results[this_id]["avg_cn"] = this_area
+                results[this_id]["avg_cn"] = clean(this_area)
             else:
-                results[this_id] = {"avg_cn": this_area}
+                results[this_id] = {"avg_cn": clean(this_area)}
     
     # calculate average slope within each catchment for all catchments
     table_slopes = so("slopes_zs_table","timestamp","fgdb")
@@ -261,9 +263,9 @@ def derive_data_from_catchments(
             this_id = r[0]
             this_area = r[1]
             if this_id in results.keys():
-                results[this_id]["avg_slope"] = this_area
+                results[this_id]["avg_slope"] = clean(this_area)
             else:
-                results[this_id] = {"avg_slope": this_area}
+                results[this_id] = {"avg_slope": clean(this_area)}
     
     # calculate area of each catchment
     #ZonalGeometryAsTable(catchment_areas,"Value","output_table") # crashes like an mfer
@@ -278,9 +280,9 @@ def derive_data_from_catchments(
             this_id = r[0]
             this_area = r[1] * area_conv_factor
             if this_id in results.keys():
-                results[this_id]["area_sqkm"] = this_area 
+                results[this_id]["area_sqkm"] = clean(this_area)
             else:
-                results[this_id] = {"area_sqkm": this_area}
+                results[this_id] = {"area_sqkm": clean(this_area)}
     
     # flip results object into a records-style array of dictionaries
     # (this makes conversion to table later on simpler)
@@ -288,10 +290,10 @@ def derive_data_from_catchments(
     records = []
     for k in results.iterkeys():
         record = {
-            "area_sqkm":"",
-            "avg_slope":"",
-            "max_fl":"",
-            "avg_cn":""
+            "area_sqkm":0,
+            "avg_slope":0,
+            "max_fl":0,
+            "avg_cn":0
         }
         for each_result in record.keys():
             if each_result in results[k].keys():
@@ -304,11 +306,11 @@ def derive_data_from_catchments(
     else:
         return records, None
 
-
 def calc_catchment_flowlength_max(
     catchment_area_raster,
     zone_value,
-    flow_direction_raster
+    flow_direction_raster,
+    length_conv_factor #???
     ):
     
     """
@@ -334,6 +336,8 @@ def calc_catchment_flowlength_max(
     # calculate flow length
     fl = FlowLength(fd,"UPSTREAM")
     # determine maximum flow length
-    fl_max = fl.maximum
+    fl_max = fl.maximum 
+    #TODO: convert length to ? using length_conv_factor (detected from the flow direction raster)
+    fl_max = fl_max * length_conv_factor
         
     return fl_max

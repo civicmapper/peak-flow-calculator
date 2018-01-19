@@ -99,3 +99,11 @@ def attempt_pkg_install(pkg):
         except:
             msg("This tool was unable to find or install a required dependency: {0}".format(pkg))
             exit
+
+def clean(val):
+    """post-process empty values ("") from ArcPy geoprocessing tools.
+    """
+    if val in ["", None]:
+        return 0
+    else:
+        return val

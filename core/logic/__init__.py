@@ -48,18 +48,18 @@ from utils import so, msg, attempt_pkg_install
 
 # add'l dependencies, not included with ArcMap's Python installtion;
 # this is here in case user hasn't attempted `pip install -r requirements.txt`
-try:
-    import petl as etl
-except:
-    attempt_pkg_import('petl>=1.1')
-try:    
-    import click
-except:
-    attempt_pkg_import('click>=6')
-try:
-    import pint
-except:
-    attempt_pkg_import('pint>=0.8.1')
+# try:
+import petl as etl
+# except:
+    # attempt_pkg_import('petl>=1.1')
+# try:    
+# import click
+# except:
+    # attempt_pkg_import('click>=6')
+# try:
+import pint
+# except:
+    # attempt_pkg_import('pint>=0.8.1')
 
 
 # -----------------------------------------------------------------------------
@@ -72,7 +72,7 @@ units = pint.UnitRegistry()
 # Application controller
 #
 
-def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, output, output_catchments=None, pour_point_field=None, input_watershed_raster=None, area_conv_factor=0.00000009290304):
+def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, output, output_catchments=None, pour_point_field=None, input_watershed_raster=None, area_conv_factor=0.00000009290304, length_conv_factor=1):
     """Main controller for running the drainage/peak-flow calculator with geospatial data
     
     Arguments:
@@ -111,26 +111,30 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
     env.cellSize = (env_raster.meanCellHeight + env_raster.meanCellWidth) / 2.0
     env.extent = env_raster.extent
     for i in ListEnvironments():
-        msg("\t%-24s: %s" % (i, env[i]))
+        msg("\t%-31s: %s" % (i, env[i]))
 
-    msg('Determing linear units of reference raster dataset...')
+    msg('Determing units of reference raster dataset...')
     # get the name of the linear unit from env_raster
     unit_name = env_raster.spatialReference.linearUnitName
-    f = None
+    acf, lcf = None, None
     # attempt to auto-dectect unit names for use with the Pint package
     if unit_name:
         if 'foot'.upper() in unit_name.upper():
-            f = 1 * units.square_foot
+            acf = 1 * units.square_foot
+            lcf = 1 * units.foot
             msg("...auto-detected 'feet' from the source data")
         elif 'meter'.upper() in unit_name.upper():
-            f = 1 * (units.meter ** 2)
+            acf = 1 * (units.meter ** 2)
+            lcf = 1 * units.meter
             msg("...auto-detected 'meters' from the source data")
         else:
             msg("Could not determine conversion factor for '{0}'".format(unit_name))
     else:
         msg("Reference raster dataset has no spatial reference information.")
-    if f:
-        area_conv_factor = f.to(units.kilometer ** 2).magnitude
+    if acf and lcf:
+        # get correct conversion factor for casting units to that required by equations in calc.py
+        area_conv_factor = acf.to(units.kilometer ** 2).magnitude
+        length_conv_factor = lcf.to(units.meter).magnitude #NOTE: WHAT IS THE UNIT FOR THIS SUPPOSED TO BE (used for flow length ==> t/c calc)
     msg("Area conversion factor: {0}".format(area_conv_factor))
 
 
@@ -159,6 +163,7 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
             pour_point_field=pour_point_field
         )
         catchment_areas = catchment_results['catchments']
+        msg("Analyzing Peak Flow for {0} inlet(s)".format(catchment_results['count']))
     else:
         catchment_areas = input_watershed_raster
 
@@ -169,13 +174,16 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
         slope_raster=slope_raster,
         curve_number_raster=cn_raster,
         area_conv_factor=area_conv_factor,
+        length_conv_factor=length_conv_factor
         out_catchment_polygons=output_catchments
     )
 
     all_results = []
 
     for each_catchment in catchment_params[0]:
-        msg("analyzing {0}\n\t{1}".format(each_catchment["id"],each_catchment))
+        msg("\n-----\nAnalyzing {0}".format(each_catchment["id"]))
+        for i in each_catchment.items():
+            msg("\t%-12s: %s" % (i[0], i[1]))
 
         # calculate the t of c parameter for this catchment
         time_of_concentration = calculate_tc(
@@ -203,7 +211,7 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
     # convert our sequence of Python dicts into a table
     temp_csv = "{0}.csv".format(so("qp_results", "timestamp", "folder"))
     etl.tocsv(etl.fromdicts(all_results), temp_csv)
-    msg("temporary table saved: {0}".format(temp_csv))
+    msg("Results csv saved: {0}".format(temp_csv))
     # load into a temporary table
     results_table = load_csv(temp_csv)
     # join that to a copy of the inlets
@@ -214,7 +222,7 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
         join_field=pour_point_field,
         fields="Y1;Y2;Y5;Y10;Y25;Y50;Y100;Y200;avg_slope;avg_cn;area_sqkm;max_fl"
     )
-    msg("Output saved {0}".format(inlets_copy))  
+    msg("Output inlets (points) saved\n\t{0}".format(inlets_copy))  
 
     if catchment_params[1]:
         JoinField_management(
@@ -224,6 +232,6 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
             join_field=pour_point_field,
             fields="Y1;Y2;Y5;Y10;Y25;Y50;Y100;Y200;avg_slope;avg_cn;area_sqkm;max_fl"
         )
-        msg("Output saved {0}".format(catchment_params[1]))
+        msg("Output catchments (polygons) saved\n\t{0}".format(catchment_params[1]))
       
     return inlets_copy, catchment_params[1]

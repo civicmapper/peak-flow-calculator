@@ -68,7 +68,7 @@ def precip_table_etl_noaa(
         -frequency_min: the min. annual frequency to be returned. Default: 1
         -frequency_max: the max. annual frequency to be returned. Default: 200
         -conversion_factor: apply to rainfall values. Default: 2.54
-            (convert inches to centimeters),
+            (convert inches to centimeters).
         - desc_field: exact field name from NOAA table in first column.
             Defaults to "by duration for ARI (years):". Used for selecting
             data.
@@ -82,7 +82,7 @@ def precip_table_etl_noaa(
     # load the csv table, skip the file header information, extract rows we need
     t1 = etl.fromcsv(precip_table).skip(13).rowslice(0,19)
     # grab raw data from the row containing the x-hour duration event info
-    t2 = etl.select(t1,desc_field,lambda v: v == duration_val).cutout(desc_field)
+    t2 = etl.select(t1, desc_field, lambda v: v == duration_val).cutout(desc_field)
     # generate a new header with only columns within frequency min/max
     h = tuple([
         i for i in list(etl.header(t2)) if (int(i) >= frequency_min and int(i) <= frequency_max)
