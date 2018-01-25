@@ -14,7 +14,7 @@ import petl as etl
 from utils import msg
 
 def calculate_tc(
-    max_flow_length, #NOTE: What are the units for this supposed to be?
+    max_flow_length, #units of meters
     mean_slope, 
     const_a=0.000325, 
     const_b=0.77, 
