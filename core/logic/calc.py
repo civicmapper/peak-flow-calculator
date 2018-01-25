@@ -78,7 +78,7 @@ def calculate_peak_flow(
     
     # calculate storage, S in cm
     # NOTE: DOES THIS ASSUME CURVE NUMBER RASTER IS IN METERS?
-    Storage = 0.1*((25400.0/cn)-254.0)
+    Storage = 0.1*((25400.0/cn)-254.0) #cn is the average curve number of the catchment area
     msg("\tStorage: {0}".format(Storage))
     Ia = 0.2*Storage #inital abstraction, amount of precip that never has a chance to become runoff
     msg("\tIa: {0}".format(Ia))
