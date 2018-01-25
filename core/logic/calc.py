@@ -87,6 +87,7 @@ def calculate_peak_flow(
     msg("\tP: {0}".format(P))
     #calculate depth of runoff from each storm
     #if P < Ia NO runoff is produced
+    #P in cm
     Pe = (P - Ia)
     Pe = numpy.array([0 if i < 0 else i for i in Pe]) # get rid of negative Pe's
     msg("\tPe: {0}".format(Pe))
@@ -109,9 +110,9 @@ def calculate_peak_flow(
 
     qu = 10 ** (Const0+Const1*numpy.log10(tc)+Const2*(numpy.log10(tc))**2-2.366)
     msg("\tqu: {0}".format(qu))
-    q_peak = Q*qu*catchment_area_sqkm #qu has weird units which take care of the difference between Q in cm and area in km2
+    q_peak = Q*qu*catchment_area_sqkm #qu has weird units which take care of the difference between Q in cm and area in km2 (m^3 s^-1 km^-2 cm^-1)
     msg("\tq_peak: {0}".format(q_peak))
-    Qp = q_peak
+    Qp = q_peak # m^3 s^-1
 
     # TODO: parameterize the range of values (goes all the way back to how NOAA csv is ingested)
     qp_header = ['Y1','Y2','Y5','Y10','Y25','Y50','Y100','Y200']#,'Y500']
