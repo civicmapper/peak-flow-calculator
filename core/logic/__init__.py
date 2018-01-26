@@ -135,7 +135,8 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
         # get correct conversion factor for casting units to that required by equations in calc.py
         area_conv_factor = acf.to(units.kilometer ** 2).magnitude
         length_conv_factor = lcf.to(units.meter).magnitude #NOTE: WHAT IS THE UNIT FOR THIS SUPPOSED TO BE (used for flow length ==> t/c calc)
-    msg("Area conversion factor: {0}".format(area_conv_factor))
+        msg("Area conversion factor: {0}".format(area_conv_factor))
+        msg("Length conversion factor: {0}".format(length_conv_factor))
 
 
     msg('Loading precipitation table...')
@@ -174,7 +175,7 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
         slope_raster=slope_raster,
         curve_number_raster=cn_raster,
         area_conv_factor=area_conv_factor,
-        length_conv_factor=length_conv_factor
+        length_conv_factor=length_conv_factor,
         out_catchment_polygons=output_catchments
     )
 

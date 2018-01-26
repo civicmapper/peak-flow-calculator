@@ -231,7 +231,7 @@ def derive_data_from_catchments(
             fl_max = calc_catchment_flowlength_max(
                 catchment_areas,
                 this_id,
-                flow_direction_raster
+                flow_direction_raster,
                 length_conv_factor
             )
             if this_id in results.keys():
