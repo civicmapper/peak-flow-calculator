@@ -8,7 +8,8 @@ runs ArcPy geoprocessing tools
 import os, time
 # ArcPy imports
 from arcpy import Describe, Raster
-from arcpy import GetCount_management, BuildRasterAttributeTable_management, MakeTableView_management, ProjectRaster_management, Clip_management
+from arcpy import GetCount_management, BuildRasterAttributeTable_management, MakeTableView_management, 
+from arcpy import ProjectRaster_management, Clip_management, Dissolve_management
 from arcpy import RasterToPolygon_conversion, TableToTable_conversion, CopyFeatures_management, JoinField_management
 from arcpy.sa import Watershed, FlowLength, Slope, SetNull, ZonalStatisticsAsTable, FlowDirection#, ZonalGeometryAsTable
 from arcpy.da import SearchCursor
@@ -273,9 +274,19 @@ def derive_data_from_catchments(
         cp = so("catchmentpolygons","timestamp","in_memory")
     else:
         cp = out_catchment_polygons
-    RasterToPolygon_conversion(catchment_areas, cp, "NO_SIMPLIFY", raster_field)
-    # push table into results object
-    with SearchCursor(cp,["gridcode","SHAPE@AREA"]) as c:
+    RasterToPolygon_conversion(catchment_areas, cp, "NO_SIMPLIFY", raster_field)    
+
+    # Dissolve the converted polygons, since some of the raster zones may have corner-corner links
+    cpd = so("catchmentpolygonsdissolved","timestamp","in_memory")
+    Dissolve_management(
+        in_features=cp,
+        out_features=cpd,
+        dissolve_field=raster_field,
+        multi_part="MULTI_PART"
+    )
+
+    # get the area for each record, and push into results object
+    with SearchCursor(cpd,["gridcode","SHAPE@AREA"]) as c:
         for r in c:
             this_id = r[0]
             this_area = r[1] * area_conv_factor
@@ -302,7 +313,7 @@ def derive_data_from_catchments(
         records.append(record)
     
     if out_catchment_polygons:
-        return records, cp
+        return records, cpd
     else:
         return records, None
 
