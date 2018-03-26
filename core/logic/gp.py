@@ -8,7 +8,7 @@ runs ArcPy geoprocessing tools
 import os, time
 # ArcPy imports
 from arcpy import Describe, Raster
-from arcpy import GetCount_management, BuildRasterAttributeTable_management, MakeTableView_management, 
+from arcpy import GetCount_management, BuildRasterAttributeTable_management, MakeTableView_management
 from arcpy import ProjectRaster_management, Clip_management, Dissolve_management
 from arcpy import RasterToPolygon_conversion, TableToTable_conversion, CopyFeatures_management, JoinField_management
 from arcpy.sa import Watershed, FlowLength, Slope, SetNull, ZonalStatisticsAsTable, FlowDirection#, ZonalGeometryAsTable
@@ -270,18 +270,19 @@ def derive_data_from_catchments(
     
     # calculate area of each catchment
     #ZonalGeometryAsTable(catchment_areas,"Value","output_table") # crashes like an mfer
-    if not out_catchment_polygons:
-        cp = so("catchmentpolygons","timestamp","in_memory")
-    else:
-        cp = out_catchment_polygons
-    RasterToPolygon_conversion(catchment_areas, cp, "NO_SIMPLIFY", raster_field)    
+    cp = so("catchmentpolygons","timestamp","in_memory")
+    #RasterToPolygon copies our ids from raster_field into "gridcode"
+    RasterToPolygon_conversion(catchment_areas, cp, "NO_SIMPLIFY", raster_field)
 
     # Dissolve the converted polygons, since some of the raster zones may have corner-corner links
-    cpd = so("catchmentpolygonsdissolved","timestamp","in_memory")
+    if not out_catchment_polygons:
+        cpd = so("catchmentpolygonsdissolved","timestamp","in_memory")
+    else:
+        cpd = out_catchment_polygons
     Dissolve_management(
         in_features=cp,
-        out_features=cpd,
-        dissolve_field=raster_field,
+        out_feature_class=cpd,
+        dissolve_field="gridcode",
         multi_part="MULTI_PART"
     )
 
