@@ -1,4 +1,4 @@
-# Peak Flow Calculator
+# Peak Flow Calculator (WIP)
 
 This software is used for calculating peak flow at given points (typically, inlets/catch basins) over a hydrologically-corrected DEM
 
