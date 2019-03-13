@@ -8,12 +8,16 @@ runs ArcPy geoprocessing tools
 import os, time
 # ArcPy imports
 from arcpy import Describe, Raster
-from arcpy import GetCount_management, BuildRasterAttributeTable_management, MakeTableView_management
-from arcpy import ProjectRaster_management, Clip_management, Dissolve_management
-from arcpy import RasterToPolygon_conversion, TableToTable_conversion, CopyFeatures_management, JoinField_management
-from arcpy.sa import Watershed, FlowLength, Slope, SetNull, ZonalStatisticsAsTable, FlowDirection#, ZonalGeometryAsTable
+from arcpy import GetCount_management, Clip_management, Dissolve_management, CopyFeatures_management
+from arcpy import JoinField_management, MakeTableView_management
+from arcpy import BuildRasterAttributeTable_management, ProjectRaster_management
+from arcpy import RasterToPolygon_conversion, TableToTable_conversion, PolygonToRaster_conversion
+from arcpy.sa import Watershed, FlowLength, Slope, SetNull, ZonalStatisticsAsTable, FlowDirection, Con #, ZonalGeometryAsTable
 from arcpy.da import SearchCursor
 from arcpy import env
+
+# third party tools
+import petl as etl
 
 # this package
 from utils import so, msg, clean
@@ -108,7 +112,125 @@ def prep_cn_raster(
     
     return {
         "curve_number_raster": Raster(prepped_cn)
-    }
+    } 
+
+def build_cn_raster(
+    landcover_raster,
+    lookup_csv,
+    soils_polygon,
+    soils_hydrogroup_field="SOIL_HYDRO",
+    reference_raster=None,
+    out_cn_raster=None
+):
+    """Build a curve number raster from landcover raster, soils polygon, and a crosswalk between 
+    landcover classes, soil hydro groups, and curve numbers.
+
+    :param lookup_csv: [description]
+    :type lookup_csv: [type]
+    :param landcover_raster: [description]
+    :type landcover_raster: [type]
+    :param soils_polygon: polygon containing soils with a hydro classification. 
+    :type soils_polygon: [type]
+    :param soils_hydrogroup_field: [description], defaults to "SOIL_HYDRO" (from the NCRS soils dataset)
+    :type soils_hydrogroup_field: str, optional
+    :param out_cn_raster: [description]
+    :type out_cn_raster: [type]    
+    """
+
+    # GP Environment ----------------------------
+    msg("Setting up GP Environment...")
+    # if reference_raster is provided, we use it to set the GP environment for 
+    # subsequent raster operations
+    if reference_raster: 
+        if not isinstance(reference_raster,Raster):
+            # read in the reference raster as a Raster object.
+            reference_raster = Raster(reference_raster)
+    else:
+        reference_raster = Raster(landcover_raster)
+
+    # set the snap raster, cell size, and extent, and coordinate system for subsequent operations
+    env.snapRaster = reference_raster
+    env.cellSize = reference_raster.meanCellWidth
+    env.extent = reference_raster
+    env.outputCoordinateSystem = reference_raster
+    
+    cs = env.outputCoordinateSystem.exportToString()
+
+    # SOILS -------------------------------------
+    
+    msg("Processing Soils...")
+    # read the soils polygon into a raster, get list(set()) of all cell values from the landcover raster
+    soils_raster_path = so("soils_raster")
+    PolygonToRaster_conversion(soils_polygon, soils_hydrogroup_field, soils_raster_path, "CELL_CENTER")
+    soils_raster = Raster(soils_raster_path)
+
+    # use the raster attribute table to build a lookup of raster values to soil hydro codes
+    # from the polygon (that were stored in the raster attribute table after conversion)
+    if not soils_raster.hasRAT:
+        msg("Soils raster does not have an attribute table. Building...", "warning")
+        BuildRasterAttributeTable_management(soils_raster, "Overwrite")
+    # build a 2D array from the RAT
+    fields = ["Value", soils_hydrogroup_field]
+    rows = [fields]
+    with SearchCursor(soils_raster, fields) as sc:
+        for row in sc:
+            rows.append([row[0], row[1]])
+    # turn that into a dictionary, where the key==soil hydro text and value==the raster cell value
+    lookup_from_soils = {v: k for k, v in etl.records(rows)}
+    # also capture a list of just the values, used to iterate conditionals later
+    soil_values = [v['Value'] in etl.records(rows)]
+
+    # LANDCOVER ---------------------------------
+    msg("Processing Landcover...")
+    if not isinstance(landcover_raster, Raster):
+        # read in the reference raster as a Raster object.
+        landcover_raster = Raster(landcover_raster)
+    landcover_values = []
+    with SearchCursor(landcover_raster, ["Value"]) as sc:
+        for row in sc:
+            landcover_values.append(row[0])
+
+    # LOOKUP TABLE ------------------------------
+    msg("Processing Lookup Table...")
+    # read the lookup csv, clean it up, and use the lookups from above to limit it to just
+    # those values in the rasters
+    t = etl\
+        .fromcsv(lookup_csv)\
+        .convert('utc', int)\
+        .convert('cn', int)\
+        .select('soil', lambda v: v in lookup_from_soils.keys())\
+        .convert('soil', lookup_from_soils)\
+        .select('utc', lambda v: v in landcover_values)
+    
+    # This gets us a table where we the landcover class (as a number) corresponding to the 
+    # correct value in the converted soil raster, with the corresponding curve number.
+
+    # DETERMINE CURVE NUMBERS -------------------
+    msg("Assigning Curve Numbers...")
+    # Use that to reassign cell values using conditional map algebra operations
+    cn_rasters = []
+    for rec in etl.records(t):
+        cn_raster_component = Con((landcover_raster == rec.utc) & (soils_raster == rec.soil), rec.cn, 0)
+        cn_rasters.append(cn_raster_component)
+
+    cn_raster = CellStatistics(cn_rasters, "MAXIMUM")
+
+    # REPROJECT THE RESULTS -------------------
+    msg("Reprojecting and saving the results....")
+    if not out_cn_raster:
+        out_cn_raster = so("cn_raster","random","in_memory")
+
+    ProjectRaster_management(
+        in_raster=cn_raster,
+        out_raster=out_cn_raster,
+        out_coor_system=cs,
+        resampling_type="NEAREST",
+        cell_size=env.cellSize
+    )
+    
+    # cn_raster.save(out_cn_raster)
+    return out_cn_raster
+
 
 def derive_from_dem(dem):
     """derive slope and flow direction from a DEM.
