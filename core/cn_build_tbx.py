@@ -5,11 +5,13 @@ ArcToolbox script interface to the Curve Number Raster Builder script.
 
 Used when you need to build a Curve Number Raster from scratch, using landcover, soils, and curve number lookup CSV.
 '''
-
+import importlib
 from arcpy import GetParameterAsText
-from logic.gp import build_cn_raster
+#from logic.gp import build_cn_raster
+import logic
+importlib.reload(logic)
 
-build_cn_raster(
+logic.gp.build_cn_raster(
     landcover_raster=GetParameterAsText(0),
     lookup_csv=GetParameterAsText(3),
     soils_polygon = GetParameterAsText(1),
