@@ -1,8 +1,5 @@
 '''
-Peak-flow
-
-These can be called directly through a CLI.
-
+Peak-flow-calculator command line interface
 '''
 
 # application

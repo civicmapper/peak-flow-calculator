@@ -11,11 +11,11 @@ import numpy
 # dependencies (3rd party)
 import petl as etl
 
-from utils import msg
+from .utils import msg
 
 def calculate_tc(
     max_flow_length, #units of meters
-    mean_slope, 
+    mean_slope, # percent slope
     const_a=0.000325, 
     const_b=0.77, 
     const_c=-0.385
@@ -31,6 +31,8 @@ def calculate_tc(
     Outputs:
         tc_hr: time of concentration (hourly)
     """
+    if not mean_slope:
+        mean_slope = 0.00001
     tc_hr = const_a * math.pow(max_flow_length, const_b) * math.pow((mean_slope / 100), const_c)
     return tc_hr
 

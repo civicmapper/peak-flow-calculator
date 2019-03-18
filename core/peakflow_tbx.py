@@ -1,5 +1,5 @@
 '''
-tbx_peakflow_calc.py
+peakflow2_tbx.py
 
 ArcToolbox script interface to the peak flow tool.
 '''

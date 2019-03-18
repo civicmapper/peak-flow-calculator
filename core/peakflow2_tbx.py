@@ -1,7 +1,9 @@
 '''
-tbx_peakflow_calc.py
+peakflow2_tbx.py
 
 ArcToolbox script interface to the peak flow tool.
+
+Includes an additional argument for inputing a pre-calculated basin layer, which speeds up the execution time.
 '''
 
 from arcpy import GetParameterAsText

@@ -7,22 +7,27 @@ Some utilities
 import os, time
 
 from arcpy import AddMessage, AddWarning, AddError, CreateUniqueName
+from arcpy import SetProgressor, SetProgressorLabel, SetProgressorPosition, ResetProgressor
 from arcpy import env
 
 import click
 
-def msg(text, arc_status=None):
+def msg(text, arc_status=None, set_progressor_label=False):
     """
     output messages through Click.echo (cross-platform shell printing) 
-    and the ArcPy GP messaging interface
+    and the ArcPy GP messaging interface and progress bars
     """
     click.echo(text)
+
     if arc_status == "warning":
         AddWarning(text)
     elif arc_status == "error":
         AddError(text)
     else:
         AddMessage(text)
+    
+    if set_progressor_label:
+        SetProgressorLabel(text)
 
 def so(prefix, suffix="random", where="fgdb"):
     """complete path generator for Scratch Output (for use with ArcPy GP tools)

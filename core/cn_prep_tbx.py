@@ -1,7 +1,9 @@
 '''
-tbx_peakflow_calc.py
+cn_prep_tbx.py
 
-ArcToolbox script interface to the peak flow tool.
+ArcToolbox script interface to Curve Number Raster preparation script.
+
+Used when you already have a curve number raster, but need to snap it to the DEM being used for calculating peak-flow.
 '''
 
 from arcpy import GetParameterAsText

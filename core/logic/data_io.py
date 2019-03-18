@@ -21,11 +21,11 @@ def precip_table_etl_cnrccep(
     Extract, Transform, and Load data from a Cornell Northeast Regional
     Climate Center Extreme Precipitation estimates csv into an array
     
-    Output: 1D array used by the runoff calculator. Example: 
-        [5.207, 6.096, 7.543800000000001, 8.864600000000001, 10.9982, 12.9286, 15.2146, 17.907, 22.1996]
+    Output: 1D array containing 24-hour duration estimate for frequencies 1,2,5,10,25,50,100,200 years. Example: 
+        [5.207, 6.096, 7.5438, 8.8646, 10.9982, 12.9286, 15.2146, 17.907, 22.1996]
     
     """
-    Precips = []
+    precips = []
 
     # Open the precipitation data csv and read all the precipitations out.
     with open(ws_precip) as g:
@@ -40,12 +40,12 @@ def precip_table_etl_cnrccep(
             # Grab data from column containing 24-hour estimate
             P=float(row[10])
             # convert to cm and adjust for future rainfall conditions (if rainfall_adjustment is > 1)
-            Precips.append(P*2.54*rainfall_adjustment)
+            precips.append(P*2.54*rainfall_adjustment)
             if k>8:
                 break
             else:
                 k=k+1
-    return Precips
+    return precips
 
 def precip_table_etl_noaa(
     precip_table,
@@ -80,20 +80,25 @@ def precip_table_etl_noaa(
         frequencies 1,2,5,10,25,50,100,200 years
     """
     # load the csv table, skip the file header information, extract rows we need
-    t1 = etl.fromcsv(precip_table).skip(13).rowslice(0,19)
+    t1 = etl\
+        .fromcsv(precip_table)\
+        .skip(13)\
+        .rowslice(0,19)
     # grab raw data from the row containing the x-hour duration event info
-    t2 = etl.select(t1, desc_field, lambda v: v == duration_val).cutout(desc_field)
+    t2 = etl\
+        .select(t1, desc_field, lambda v: v == duration_val)\
+        .cutout(desc_field)
     # generate a new header with only columns within frequency min/max
     h = tuple([
         i for i in list(etl.header(t2)) if (int(i) >= frequency_min and int(i) <= frequency_max)
     ])
     # for events within freq range, convert to cm, adjust for future rainfall
-    t3 = etl.cut(t2, h).convertall(
-        lambda v: round(float(v) * conversion_factor * rainfall_adjustment, 2)
-    )
+    t3 = etl\
+        .cut(t2, h)\
+        .convertall(lambda v: round(float(v) * conversion_factor * rainfall_adjustment, 2))
     # convert to a 1D array (values cast to floats)
-    Precips = list(etl.data(t3)[0])
+    precips = list(etl.data(t3)[0])
     # also convert to a dictionary, for lookup by event
-    Precips_Lookup = list(etl.dicts(t3))[0]
+    precips_lookup = list(etl.dicts(t3))[0]
     # return 1D array and dictionary
-    return Precips, Precips_Lookup
+    return precips, precips_lookup
