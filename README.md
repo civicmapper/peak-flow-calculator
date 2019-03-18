@@ -1,4 +1,4 @@
-# Peak Flow Calculator
+# Peak Flow Calculator (WIP)
 
 This software is used for calculating peak flow at given points (typically, inlets/catch basins) over a hydrologically-corrected DEM.
 
@@ -107,3 +107,4 @@ Available commands will likely coorespond with available ArcToolbox tools in fut
 * Merged with older versions by Tanvi Naidu June 19 2017
 * Fork, refactor, and creation of CLI and ArcMap interfaces by Christian Gass @ CivicMapper, Fall 2017
 * Updates for use within ArcGIS Pro by Christian Gass @ CivicMapper, Spring 2019
+
