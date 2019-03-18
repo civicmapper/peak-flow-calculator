@@ -12,15 +12,16 @@ from arcpy import GetCount_management, Clip_management, Dissolve_management, Cop
 from arcpy import JoinField_management, MakeTableView_management
 from arcpy import BuildRasterAttributeTable_management, ProjectRaster_management
 from arcpy import RasterToPolygon_conversion, TableToTable_conversion, PolygonToRaster_conversion
-from arcpy.sa import Watershed, FlowLength, Slope, SetNull, ZonalStatisticsAsTable, FlowDirection, Con #, ZonalGeometryAsTable
+from arcpy.sa import Watershed, FlowLength, Slope, SetNull, ZonalStatisticsAsTable, FlowDirection, Con, CellStatistics #, ZonalGeometryAsTable
 from arcpy.da import SearchCursor
 from arcpy import env
+from arcpy import SetProgressor, SetProgressorLabel, SetProgressorPosition, ResetProgressor
 
 # third party tools
 import petl as etl
 
 # this package
-from utils import so, msg, clean
+from .utils import so, msg, clean
 
 # ----------------------------------------------------------------------------
 # HELPERS
@@ -172,19 +173,20 @@ def build_cn_raster(
     # build a 2D array from the RAT
     fields = ["Value", soils_hydrogroup_field]
     rows = [fields]
-    with SearchCursor(soils_raster, fields) as sc:
+    # soils_raster_table = MakeTableView_management(soils_raster_path)
+    with SearchCursor(soils_raster_path, fields) as sc:
         for row in sc:
             rows.append([row[0], row[1]])
     # turn that into a dictionary, where the key==soil hydro text and value==the raster cell value
     lookup_from_soils = {v: k for k, v in etl.records(rows)}
     # also capture a list of just the values, used to iterate conditionals later
-    soil_values = [v['Value'] in etl.records(rows)]
+    soil_values = [v['Value'] for v in etl.records(rows)]
 
     # LANDCOVER ---------------------------------
     msg("Processing Landcover...")
     if not isinstance(landcover_raster, Raster):
         # read in the reference raster as a Raster object.
-        landcover_raster = Raster(landcover_raster)
+        landcover_raster_obj = Raster(landcover_raster)
     landcover_values = []
     with SearchCursor(landcover_raster, ["Value"]) as sc:
         for row in sc:
@@ -210,7 +212,7 @@ def build_cn_raster(
     # Use that to reassign cell values using conditional map algebra operations
     cn_rasters = []
     for rec in etl.records(t):
-        cn_raster_component = Con((landcover_raster == rec.utc) & (soils_raster == rec.soil), rec.cn, 0)
+        cn_raster_component = Con((landcover_raster_obj == rec.utc) & (soils_raster == rec.soil), rec.cn, 0)
         cn_rasters.append(cn_raster_component)
 
     cn_raster = CellStatistics(cn_rasters, "MAXIMUM")
@@ -344,12 +346,18 @@ def derive_data_from_catchments(
     # calculate flow length for each zone. Zones must be isolated as individual
     # rasters for this to work. We handle that with calc_catchment_flowlength_max()
     # using the table to get the zone values...
+    catchment_count = int(GetCount_management(catchment_table).getOutput(0))
     with SearchCursor(catchment_table, [raster_field]) as catchments:
+
         # TODO: implement multi-processing for this loop.
-        msg("Mapping flow length for catchment:")
-        for each in catchments:
+        
+        ResetProgressor()
+        SetProgressor('step', "Mapping flow length for catchments", 0, catchment_count, 1)
+        # msg("Mapping flow length for catchments")
+
+        for idx, each in enumerate(catchments):
             this_id = each[0]
-            msg("{0}".format(this_id))
+            # msg("{0}".format(this_id))
             # calculate flow length for each "zone" in the raster
             fl_max = calc_catchment_flowlength_max(
                 catchment_areas,
@@ -361,6 +369,8 @@ def derive_data_from_catchments(
                 results[this_id]["max_fl"] = clean(fl_max)
             else:
                 results[this_id] = {"max_fl": clean(fl_max)}
+            SetProgressorPosition()
+        ResetProgressor()
 
     # calculate average curve number within each catchment for all catchments
     table_cns = so("cn_zs_table","timestamp","fgdb")
@@ -422,7 +432,7 @@ def derive_data_from_catchments(
     # (this makes conversion to table later on simpler)
     # msg(results,"warning")
     records = []
-    for k in results.iterkeys():
+    for k in results.keys():
         record = {
             "area_sqkm":0,
             "avg_slope":0,

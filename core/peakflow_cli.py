@@ -1,8 +1,5 @@
 '''
 Peak-flow-calculator command line interface
-
-These can be called directly from the command line.
-
 '''
 
 # application

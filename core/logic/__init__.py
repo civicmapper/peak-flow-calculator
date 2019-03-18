@@ -38,13 +38,15 @@ import os
 # dependencies
 from arcpy import AddMessage, AddWarning, AddError, Describe, ListEnvironments, Raster
 from arcpy import CopyFeatures_management, JoinField_management
+from arcpy import FeatureSet
 from arcpy import env
+from arcpy import SetProgressor, SetProgressorLabel, SetProgressorPosition, ResetProgressor
 
 # application imports
-from data_io import precip_table_etl_noaa
-from gp import prep_cn_raster, load_csv, join_to_copy, derive_data_from_catchments, catchment_delineation
-from calc import calculate_tc, calculate_peak_flow
-from utils import so, msg, attempt_pkg_install
+from .data_io import precip_table_etl_noaa
+from .gp import prep_cn_raster, load_csv, join_to_copy, derive_data_from_catchments, catchment_delineation
+from .calc import calculate_tc, calculate_peak_flow
+from .utils import so, msg, attempt_pkg_install
 
 # add'l dependencies, not included with ArcMap's Python installtion;
 # this is here in case user hasn't attempted `pip install -r requirements.txt`
@@ -105,15 +107,15 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
 
     """
 
-    msg('Setting environment parameters...')
+    msg('Setting environment parameters...', set_progressor_label=True)
     env_raster = Raster(flow_dir_raster)
     env.snapRaster = env_raster
     env.cellSize = (env_raster.meanCellHeight + env_raster.meanCellWidth) / 2.0
     env.extent = env_raster.extent
-    for i in ListEnvironments():
-        msg("\t%-31s: %s" % (i, env[i]))
+    # for i in ListEnvironments():
+    #     msg("\t%-31s: %s" % (i, env[i]))
 
-    msg('Determing units of reference raster dataset...')
+    msg('Determing units of reference raster dataset...', set_progressor_label=True)
     # get the name of the linear unit from env_raster
     unit_name = env_raster.spatialReference.linearUnitName
     acf, lcf = None, None
@@ -139,11 +141,19 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
         msg("Length conversion factor: {0}".format(length_conv_factor))
 
 
-    msg('Loading precipitation table...')
+    msg('Loading precipitation table...', set_progressor_label=True)
     precip_tab = precip_table_etl_noaa(precip_table=precip_table_noaa)
     precip_tab_1d = precip_tab[0]
     
-    msg('Prepping inlets...')
+    msg('Prepping inlets...', set_progressor_label=True)
+
+    if isinstance(inlets, FeatureSet):
+        msg("(reading from interactive selection)", set_progressor_label=True)
+        print(inlets)
+        inlets_fs = so("inlets_featurset")
+        inlets.save(inlets_fs)
+        inlets = inlets_fs
+
     CopyFeatures_management(
         in_features=inlets, 
         out_feature_class=output
@@ -157,18 +167,18 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
         # AddGlobalIDs_management(in_datasets="Inlet_Move10")
 
     if not input_watershed_raster:
-        msg('Delineating catchments from inlets...')
+        msg('Delineating catchments from inlets...', set_progressor_label=True)
         catchment_results = catchment_delineation(
             inlets=inlets_copy,
             flow_direction_raster=flow_dir_raster,
             pour_point_field=pour_point_field
         )
         catchment_areas = catchment_results['catchments']
-        msg("Analyzing Peak Flow for {0} inlet(s)".format(catchment_results['count']))
+        msg("Analyzing Peak Flow for {0} inlet(s)".format(catchment_results['count']), set_progressor_label=True)
     else:
         catchment_areas = input_watershed_raster
 
-    msg('Deriving calculation parameters for catchments...')
+    msg('Deriving calculation parameters for catchments...', set_progressor_label=True)
     catchment_params = derive_data_from_catchments(
         catchment_areas=catchment_areas,
         flow_direction_raster=flow_dir_raster,
@@ -181,7 +191,9 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
 
     all_results = []
 
-    for each_catchment in catchment_params[0]:
+    SetProgressor('step', 'Analyzing catchments', 0, len(catchment_params[0]),1)
+    for idx, each_catchment in enumerate(catchment_params[0]):
+        
         msg("\n-----\nAnalyzing {0}".format(each_catchment["id"]))
         for i in each_catchment.items():
             msg("\t%-12s: %s" % (i[0], i[1]))
@@ -209,6 +221,10 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
         # append that to the all_results list
         all_results.append(peak_flow_ests)
 
+        SetProgressorPosition()
+    
+    ResetProgressor()
+
     # convert our sequence of Python dicts into a table
     temp_csv = "{0}.csv".format(so("qp_results", "timestamp", "folder"))
     etl.tocsv(etl.fromdicts(all_results), temp_csv)
@@ -216,6 +232,7 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
     # load into a temporary table
     results_table = load_csv(temp_csv)
     # join that to a copy of the inlets
+    msg("Saving results to pour points layer", set_progressor_label=True)
     JoinField_management(
         in_data=inlets_copy, 
         in_field=pour_point_field, 
@@ -226,6 +243,7 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
     msg("Output inlets (points) saved\n\t{0}".format(inlets_copy))  
 
     if catchment_params[1]:
+        msg("Saving results to catchment layer", set_progressor_label=True)
         JoinField_management(
             in_data=catchment_params[1], 
             in_field='gridcode',
@@ -235,4 +253,6 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
         )
         msg("Output catchments (polygons) saved\n\t{0}".format(catchment_params[1]))
       
+    ResetProgressor()
+    
     return inlets_copy, catchment_params[1]
