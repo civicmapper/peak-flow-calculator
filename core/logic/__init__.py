@@ -135,8 +135,8 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
         msg("Reference raster dataset has no spatial reference information.")
     if acf and lcf:
         # get correct conversion factor for casting units to that required by equations in calc.py
-        area_conv_factor = acf.to(units.kilometer ** 2).magnitude
-        length_conv_factor = lcf.to(units.meter).magnitude #NOTE: WHAT IS THE UNIT FOR THIS SUPPOSED TO BE (used for flow length ==> t/c calc)
+        area_conv_factor = acf.to(units.kilometer ** 2).magnitude #square kilometers
+        length_conv_factor = lcf.to(units.meter).magnitude #meters
         msg("Area conversion factor: {0}".format(area_conv_factor))
         msg("Length conversion factor: {0}".format(length_conv_factor))
 
