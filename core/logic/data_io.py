@@ -51,7 +51,7 @@ def precip_table_etl_noaa(
     precip_table,
     rainfall_adjustment=1,
     frequency_min=1,
-    frequency_max=200,
+    frequency_max=1000,
     conversion_factor=2.54,
     desc_field="by duration for ARI (years):",
     duration_val="24-hr:"
@@ -65,19 +65,19 @@ def precip_table_etl_noaa(
     Optional Inputs:
         - rainfall_adjustment: multipler to adjust for future rainfall
             conditions. defaults to 1.
-        -frequency_min: the min. annual frequency to be returned. Default: 1
-        -frequency_max: the max. annual frequency to be returned. Default: 200
-        -conversion_factor: apply to rainfall values. Default: 2.54
+        - frequency_min: the min. annual frequency to be returned. Default: 1
+        - frequency_max: the max. annual frequency to be returned. Default: 1000
+        - conversion_factor: apply to rainfall values. Default: 2.54
             (convert inches to centimeters).
         - desc_field: exact field name from NOAA table in first column.
             Defaults to "by duration for ARI (years):". Used for selecting
             data.
-        -duration_val: exact row value in the desc_field from NOAA table that
+        - duration_val: exact row value in the desc_field from NOAA table that
             contains the duration of interest. Defaults to "24-hr:". Used for
             selecting data.
     Outputs:
         - precip_array: 1D array containing 24-hour duration estimate for
-        frequencies 1,2,5,10,25,50,100,200 years
+        frequencies 1,2,5,10,25,50,100,200,500,and 1000 year storm events
     """
     # load the csv table, skip the file header information, extract rows we need
     t1 = etl\

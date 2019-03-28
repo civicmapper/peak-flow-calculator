@@ -41,8 +41,7 @@ def calculate_peak_flow(
     tc_hr, 
     avg_cn, 
     precip_table, 
-    uid=None,
-    qp_header =['Y1','Y2','Y5','Y10','Y25','Y50','Y100','Y200']#,'Y500']
+    qp_header =['Y1','Y2','Y5','Y10','Y25','Y50','Y100','Y200','Y500','Y1000']
     ):
     """
     calculate peak runoff statistics at a "pour point" (e.g., a stormwater
@@ -110,15 +109,16 @@ def calculate_peak_flow(
     Const1 = (rain_ratio ** 2) * 1.5555 - (rain_ratio * 0.7081) - 0.5584
     Const2 = (rain_ratio ** 2)* 0.6041 + (rain_ratio * 0.0437) - 0.1761
 
+    #qu has weird units which take care of the difference between Q in cm and area in km2 (m^3 s^-1 km^-2 cm^-1)
     qu = 10 ** (Const0+Const1*numpy.log10(tc)+Const2*(numpy.log10(tc))**2-2.366)
     msg("\tqu: {0}".format(qu))
-    q_peak = Q*qu*catchment_area_sqkm #qu has weird units which take care of the difference between Q in cm and area in km2 (m^3 s^-1 km^-2 cm^-1)
+    q_peak = Q*qu*catchment_area_sqkm 
     msg("\tq_peak: {0}".format(q_peak))
     Qp = q_peak # m^3 s^-1
 
     # TODO: parameterize the range of values (goes all the way back to how NOAA csv is ingested)
-    qp_header = ['Y1','Y2','Y5','Y10','Y25','Y50','Y100','Y200']#,'Y500']
-    qp_data = [Qp[0],Qp[1],Qp[2],Qp[3],Qp[4],Qp[5],Qp[6],Qp[7]]#,Qp[8]]
+    qp_header = ['Y1','Y2','Y5','Y10','Y25','Y50','Y100','Y200','Y500','Y1000']
+    qp_data = [Qp[0],Qp[1],Qp[2],Qp[3],Qp[4],Qp[5],Qp[6],Qp[7],Qp[8], Qp[9]]
 
     results = OrderedDict(zip(qp_header,qp_data))
     msg("Results:")
