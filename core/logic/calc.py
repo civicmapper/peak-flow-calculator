@@ -13,6 +13,8 @@ import petl as etl
 
 from .utils import msg
 
+QP_HEADER=['Y1','Y2','Y5','Y10','Y25','Y50','Y100','Y200','Y500','Y1000'] 
+
 def calculate_tc(
     max_flow_length, #units of meters
     mean_slope, # percent slope
@@ -40,8 +42,9 @@ def calculate_peak_flow(
     catchment_area_sqkm, 
     tc_hr, 
     avg_cn, 
-    precip_table, 
-    qp_header =['Y1','Y2','Y5','Y10','Y25','Y50','Y100','Y200','Y500','Y1000']
+    precip_table,
+    uid,
+    qp_header=QP_HEADER
     ):
     """
     calculate peak runoff statistics at a "pour point" (e.g., a stormwater
@@ -61,7 +64,7 @@ def calculate_peak_flow(
         - runoff: a dictionary indicating peak runoff at the pour point for
         various storm events by duration and frequency
     """
-    
+
     # reference some variables:
     # time of concentration in hours
     tc = tc_hr
@@ -71,7 +74,7 @@ def calculate_peak_flow(
     # Skip calculation altogether if curve number or time of concentration are 0.
     # (this indicates invalid data)
     if cn in [0,'',None] or tc in [0,'',None]:
-        qp_data = [0 for i in range(0,len(qp_header))]#,Qp[8]]
+        qp_data = [0 for i in range(0,len(qp_header))]
         return OrderedDict(zip(qp_header,qp_data))
     
     # array for storing peak flows
@@ -101,9 +104,8 @@ def calculate_peak_flow(
     #  We are using rainfall Type II because that is applicable to most of New York State
     #  rain_ratio is a vector with one element per input return period
     rain_ratio = Ia/P
-    rain_ratio = numpy.array([.1 if i < .1 else .5 if i > .5 else i for i in rain_ratio])
+    rain_ratio = numpy.array([.1 if i < .1 else .5 if i > .5 else i for i in rain_ratio]) # keep rain ratio within limits set by TR55
     msg("\tRain Ratio: {0}".format(rain_ratio))
-    # keep rain ratio within limits set by TR55
 
     Const0 = (rain_ratio ** 2) * -2.2349 + (rain_ratio * 0.4759) + 2.5273
     Const1 = (rain_ratio ** 2) * 1.5555 - (rain_ratio * 0.7081) - 0.5584
@@ -113,14 +115,11 @@ def calculate_peak_flow(
     qu = 10 ** (Const0+Const1*numpy.log10(tc)+Const2*(numpy.log10(tc))**2-2.366)
     msg("\tqu: {0}".format(qu))
     q_peak = Q*qu*catchment_area_sqkm 
-    msg("\tq_peak: {0}".format(q_peak))
-    Qp = q_peak # m^3 s^-1
+    Qp = q_peak.tolist() # m^3 s^-1
+    msg("\tq_peak: {0}".format(Qp))
 
-    # TODO: parameterize the range of values (goes all the way back to how NOAA csv is ingested)
-    qp_header = ['Y1','Y2','Y5','Y10','Y25','Y50','Y100','Y200','Y500','Y1000']
-    qp_data = [Qp[0],Qp[1],Qp[2],Qp[3],Qp[4],Qp[5],Qp[6],Qp[7],Qp[8], Qp[9]]
-
-    results = OrderedDict(zip(qp_header,qp_data))
+    # TODO: better parameterize the header here (goes all the way back to how NOAA csv is ingested)
+    results = OrderedDict(zip(qp_header,q_peak))
     msg("Results:")
     for i in results.items():
         msg("\t%-5s: %s" % (i[0], i[1]))

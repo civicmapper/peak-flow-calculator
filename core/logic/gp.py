@@ -437,7 +437,8 @@ def derive_data_from_catchments(
             "area_sqkm":0,
             "avg_slope":0,
             "max_fl":0,
-            "avg_cn":0
+            "avg_cn":0,
+            "tc_hr":0
         }
         for each_result in record.keys():
             if each_result in results[k].keys():

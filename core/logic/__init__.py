@@ -70,11 +70,29 @@ import pint
 
 units = pint.UnitRegistry()
 
+QP_HEADER = ['Y1','Y2','Y5','Y10','Y25','Y50','Y100','Y200','Y500','Y1000']
+ANALYSIS_FIELDS = ['avg_slope', 'avg_cn', 'tc_hr', 'area_sqkm', 'max_fl']
+OUTPUT_FIELDS = QP_HEADER + ANALYSIS_FIELDS
+
 # -----------------------------------------------------------------------------
 # Application controller
 #
 
-def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, output, output_catchments=None, pour_point_field=None, input_watershed_raster=None, area_conv_factor=0.00000009290304, length_conv_factor=1):
+def main(
+    inlets, 
+    flow_dir_raster, 
+    slope_raster, 
+    cn_raster, 
+    precip_table_noaa, 
+    output, 
+    output_catchments=None, 
+    pour_point_field=None, 
+    input_watershed_raster=None, 
+    area_conv_factor=0.00000009290304, 
+    length_conv_factor=1,
+    output_fields=OUTPUT_FIELDS,
+    convert_to_imperial=True
+    ):
     """Main controller for running the drainage/peak-flow calculator with geospatial data
     
     Arguments:
@@ -107,6 +125,9 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
 
     """
 
+    # -----------------------------------------------------
+    # SET ENVIRONMENT VARIABLES
+    
     msg('Setting environment parameters...', set_progressor_label=True)
     env_raster = Raster(flow_dir_raster)
     env.snapRaster = env_raster
@@ -114,6 +135,9 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
     env.extent = env_raster.extent
     # for i in ListEnvironments():
     #     msg("\t%-31s: %s" % (i, env[i]))
+
+    # -----------------------------------------------------
+    # DETERMINE UNITS OF INPUT DATASETS
 
     msg('Determing units of reference raster dataset...', set_progressor_label=True)
     # get the name of the linear unit from env_raster
@@ -140,10 +164,15 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
         msg("Area conversion factor: {0}".format(area_conv_factor))
         msg("Length conversion factor: {0}".format(length_conv_factor))
 
+    # -----------------------------------------------------
+    # READ IN THE PRECIP TABLE
 
     msg('Loading precipitation table...', set_progressor_label=True)
     precip_tab = precip_table_etl_noaa(precip_table=precip_table_noaa)
     precip_tab_1d = precip_tab[0]
+
+    # -----------------------------------------------------
+    # PREPARE THE INPUTS/POUR POINTS
     
     msg('Prepping inlets...', set_progressor_label=True)
 
@@ -166,6 +195,9 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
             pour_point_field = i.OIDFieldName
         # AddGlobalIDs_management(in_datasets="Inlet_Move10")
 
+    # -----------------------------------------------------
+    # DELINEATE WATERSHEDS
+
     if not input_watershed_raster:
         msg('Delineating catchments from inlets...', set_progressor_label=True)
         catchment_results = catchment_delineation(
@@ -177,6 +209,10 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
         msg("Analyzing Peak Flow for {0} inlet(s)".format(catchment_results['count']), set_progressor_label=True)
     else:
         catchment_areas = input_watershed_raster
+
+    # -----------------------------------------------------
+    # DERIVE CHARACTERISTICS FROM EACH CATCHMENT NEEDED TO CALCULATE PEAK FLOW
+    # area, maximum flow length, average slope, average curve number
 
     msg('Deriving calculation parameters for catchments...', set_progressor_label=True)
     catchment_params = derive_data_from_catchments(
@@ -191,6 +227,9 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
 
     all_results = []
 
+    # -----------------------------------------------------
+    # CALCULATE PEAK FLOW FOR EACH CATCHMENT
+
     SetProgressor('step', 'Analyzing catchments', 0, len(catchment_params[0]),1)
     for idx, each_catchment in enumerate(catchment_params[0]):
         
@@ -198,11 +237,19 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
         for i in each_catchment.items():
             msg("\t%-12s: %s" % (i[0], i[1]))
 
+        # -----------------------------------------------------
+        # CALCULATE TIME OF CONCENTRATION (Tc)
+
         # calculate the t of c parameter for this catchment
         time_of_concentration = calculate_tc(
             max_flow_length=each_catchment['max_fl'], 
             mean_slope=each_catchment['avg_slope'],
         )
+
+        # -----------------------------------------------------
+        # CALCULATE PEAK FLOW FOR ALL PRECIP PERIODS        
+
+        
 
         # with everything generate peak flow estimates for the catchment
         peak_flow_ests = calculate_peak_flow(
@@ -210,12 +257,18 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
             tc_hr=time_of_concentration,
             avg_cn=each_catchment['avg_cn'],
             precip_table=precip_tab_1d,
-            uid=each_catchment['id']
+            uid=each_catchment['id'],
+            qp_header=QP_HEADER
         )
+
+        # -----------------------------------------------------
+        # BUILD A RESULT OBJECT
         
         #extend the peak_flow_ests dict with the catchment params dict
         peak_flow_ests.update(each_catchment)
-        # add in the pour point field and value
+        # update with other metric(s) we've generated
+        peak_flow_ests['tc_hr'] = time_of_concentration
+        # add in the pour point ID field and value
         peak_flow_ests[pour_point_field] = each_catchment['id']
 
         # append that to the all_results list
@@ -226,22 +279,47 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
     ResetProgressor()
 
     # convert our sequence of Python dicts into a table
+    results_table = etl.fromdicts(all_results)
+
+    # -----------------------------------------------------
+    # CONVERT OUTPUT UNITS TO IMPERIAL (by default)
+    
+    # run unit conversions from metric to imperial if convert_to_imperial
+    if convert_to_imperial:
+        results_table = etl\
+            .convert(results_table, 'max_fl', lambda v: (v * units.meter).to(units.feet).magnitude)\
+            .convert('area_sqkm', lambda v: (v * (units.kilometer ** 2)).to(units.acre).magnitude)\
+            .rename('area_sqkm', 'area_acres')\
+            .convert({i: lambda v: (v * units.meter ** 3 / units.second).to(units.feet ** 3 / units.second).magnitude for i in QP_HEADER})
+
+    # that last .convert() handles conversion of all the peak flow per storm frequency values from cubic meters/second to cubic feet/second in one go :)
+
+    # -----------------------------------------------------
+    # SAVE TO DISK
+    
+    # save to a csv
     temp_csv = "{0}.csv".format(so("qp_results", "timestamp", "folder"))
-    etl.tocsv(etl.fromdicts(all_results), temp_csv)
+    etl.tocsv(results_table, temp_csv)
     msg("Results csv saved: {0}".format(temp_csv))
     # load into a temporary table
     results_table = load_csv(temp_csv)
+
+    # -----------------------------------------------------
+    # JOIN RESULTS TO THE GEODATA
+
     # join that to a copy of the inlets
     msg("Saving results to pour points layer", set_progressor_label=True)
+    
+    esri_output_fields = ";".join(output_fields)
+
     JoinField_management(
         in_data=inlets_copy, 
         in_field=pour_point_field, 
         join_table=results_table, 
         join_field=pour_point_field,
-        fields="Y1;Y2;Y5;Y10;Y25;Y50;Y100;Y200;avg_slope;avg_cn;area_sqkm;max_fl"
+        fields=esri_output_fields
     )
-    msg("Output inlets (points) saved\n\t{0}".format(inlets_copy))  
-
+    msg("Output inlets (points) saved\n\t{0}".format(inlets_copy))
     if catchment_params[1]:
         msg("Saving results to catchment layer", set_progressor_label=True)
         JoinField_management(
@@ -249,7 +327,7 @@ def main(inlets, flow_dir_raster, slope_raster, cn_raster, precip_table_noaa, ou
             in_field='gridcode',
             join_table=results_table, 
             join_field=pour_point_field,
-            fields="Y1;Y2;Y5;Y10;Y25;Y50;Y100;Y200;avg_slope;avg_cn;area_sqkm;max_fl"
+            fields=esri_output_fields
         )
         msg("Output catchments (polygons) saved\n\t{0}".format(catchment_params[1]))
       
