@@ -43,7 +43,7 @@ def calculate_peak_flow(
     tc_hr, 
     avg_cn, 
     precip_table,
-    uid,
+    uid=None,
     qp_header=QP_HEADER
     ):
     """
@@ -83,20 +83,20 @@ def calculate_peak_flow(
     # calculate storage, S in cm
     # NOTE: THIS ASSUMES THE CURVE NUMBER RASTER IS IN METERS
     Storage = 0.1*((25400.0/cn)-254.0) #cn is the average curve number of the catchment area
-    msg("\tStorage: {0}".format(Storage))
+    #msg("\tStorage: {0}".format(Storage))
     Ia = 0.2*Storage #inital abstraction, amount of precip that never has a chance to become runoff
-    msg("\tIa: {0}".format(Ia))
+    #msg("\tIa: {0}".format(Ia))
     #setup precip list for the correct watershed from dictionary
     P = numpy.array(precip_table)
-    msg("\tP: {0}".format(P))
+    #msg("\tP: {0}".format(P))
     #calculate depth of runoff from each storm
     #if P < Ia NO runoff is produced
     #P in cm
     Pe = (P - Ia)
     Pe = numpy.array([0 if i < 0 else i for i in Pe]) # get rid of negative Pe's
-    msg("\tPe: {0}".format(Pe))
+    #msg("\tPe: {0}".format(Pe))
     Q = (Pe**2)/(P+(Storage-Ia))
-    msg("\tQ: {0}".format(Q))
+    #msg("\tQ: {0}".format(Q))
     
     #calculate q_peak, cubic meters per second
     # q_u is an adjustment because these watersheds are very small. It is a function of tc,
@@ -105,7 +105,7 @@ def calculate_peak_flow(
     #  rain_ratio is a vector with one element per input return period
     rain_ratio = Ia/P
     rain_ratio = numpy.array([.1 if i < .1 else .5 if i > .5 else i for i in rain_ratio]) # keep rain ratio within limits set by TR55
-    msg("\tRain Ratio: {0}".format(rain_ratio))
+    #msg("\tRain Ratio: {0}".format(rain_ratio))
 
     Const0 = (rain_ratio ** 2) * -2.2349 + (rain_ratio * 0.4759) + 2.5273
     Const1 = (rain_ratio ** 2) * 1.5555 - (rain_ratio * 0.7081) - 0.5584
@@ -113,15 +113,15 @@ def calculate_peak_flow(
 
     #qu has weird units which take care of the difference between Q in cm and area in km2 (m^3 s^-1 km^-2 cm^-1)
     qu = 10 ** (Const0+Const1*numpy.log10(tc)+Const2*(numpy.log10(tc))**2-2.366)
-    msg("\tqu: {0}".format(qu))
+    #msg("\tqu: {0}".format(qu))
     q_peak = Q*qu*catchment_area_sqkm 
     Qp = q_peak.tolist() # m^3 s^-1
-    msg("\tq_peak: {0}".format(Qp))
+    #msg("\tq_peak: {0}".format(Qp))
 
     # TODO: better parameterize the header here (goes all the way back to how NOAA csv is ingested)
     results = OrderedDict(zip(qp_header,q_peak))
-    msg("Results:")
-    for i in results.items():
-        msg("\t%-5s: %s" % (i[0], i[1]))
+    #msg("Results:")
+    # for i in results.items():
+        #msg("\t%-5s: %s" % (i[0], i[1]))
 
     return results
