@@ -254,7 +254,7 @@ def main(
 
         # with everything generate peak flow estimates for the catchment
         peak_flow_ests = calculate_peak_flow(
-            catchment_area_up=each_catchment['area_up'], 
+            catchment_area_sqkm=each_catchment['area_up'], 
             tc_hr=time_of_concentration,
             avg_cn=each_catchment['avg_cn'],
             precip_table=precip_tab_1d,

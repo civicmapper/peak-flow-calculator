@@ -424,9 +424,9 @@ def derive_data_from_catchments(
             this_id = r[0]
             this_area = r[1] * area_conv_factor
             if this_id in results.keys():
-                results[this_id]["area_sqkm"] = clean(this_area)
+                results[this_id]["area_up"] = clean(this_area)
             else:
-                results[this_id] = {"area_sqkm": clean(this_area)}
+                results[this_id] = {"area_up": clean(this_area)}
     
     # flip results object into a records-style array of dictionaries
     # (this makes conversion to table later on simpler)
@@ -434,7 +434,7 @@ def derive_data_from_catchments(
     records = []
     for k in results.keys():
         record = {
-            "area_sqkm":0,
+            "area_up":0,
             "avg_slope":0,
             "max_fl":0,
             "avg_cn":0,
