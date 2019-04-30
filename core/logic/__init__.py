@@ -250,15 +250,12 @@ def main(
         # -----------------------------------------------------
         # CALCULATE PEAK FLOW FOR ALL PRECIP PERIODS        
 
-        
-
-        # with everything generate peak flow estimates for the catchment
+        # generate peak flow estimates for the catchment for all storm frequencies in QP_HEADER
         peak_flow_ests = calculate_peak_flow(
             catchment_area_sqkm=each_catchment['area_up'], 
             tc_hr=time_of_concentration,
             avg_cn=each_catchment['avg_cn'],
             precip_table=precip_tab_1d,
-            uid=each_catchment['id'],
             qp_header=QP_HEADER
         )
 
