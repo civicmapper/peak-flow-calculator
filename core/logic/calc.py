@@ -99,7 +99,7 @@ def calculate_peak_flow(
     Pe = (P - Ia)
     Pe = numpy.array([0 if i < 0 else i for i in Pe]) # get rid of negative Pe's
     #msg("Pe: {0}".format(Pe))
-    Q = (Pe**2)/(P+(Storage-Ia))
+    Q = (Pe**2) / (P + (Storage - Ia))
     #msg("Q: {0}".format(Q))
     
     # calculate q_peak, cubic meters per second
@@ -131,3 +131,94 @@ def calculate_peak_flow(
         #msg("%-5s: %s" % (i[0], i[1]))
 
     return results
+
+def peak_flow_core(
+    mean_slope_pct,
+    max_flow_length_m,
+    rainfall_cm,
+    basin_area_sqkm,
+    avg_cn 
+    ):
+    """This is a bare bones version of the two functions above and represents 
+    the core TR-55 logic originally developed by the Cornell Soil and Water lab. 
+    
+    Numbers go in, numbers come out.
+
+    TODO: expose hardcoded constants as parameters, and document them.
+    
+    :param mean_slope_pct: average slope in the basin, as percent rise
+    :type mean_slope_pct: float
+    :param max_flow_length_m: maximum flow length, in meters
+    :type max_flow_length_m: float
+    :param rainfall_cm: rainfall for a 24 hour event, in centimeters
+    :type rainfall_cm: float
+    :param basin_area_sqkm: area of the basin, in square kilometers
+    :type basin_area_sqkm: float
+    :param avg_cn: average curve number of the basin, area-weighted
+    :type avg_cn: float
+    :return: peak flow, in cubic meters / second
+    :rtype: float
+    """
+
+    # INIITAL CHECKS ------------------------------------------
+
+    # Skip calculation altogether if curve number or time of concentration are 0.
+    # (this indicates invalid data)
+    if avg_cn in [0,'',None] or tc_hr in [0,'',None]:
+        return None    
+
+    # -------------------------------------------
+    # TIME OF CONCENTRATION
+
+    TC_CONST_A = 0.000325
+    TC_CONST_B = 0.77
+    TC_CONST_C = -0.385
+
+    if not mean_slope_pct:
+        mean_slope_pct = 0.00001
+
+    # time of concentration in hours
+    tc_hr = TC_CONST_A * math.pow(max_flow_length, TC_CONST_B) * math.pow((mean_slope_pct / 100), TC_CONST_C)
+    
+    # -------------------------------------------
+    # STORAGE 
+    
+    # calculate storage, S in cm
+    # NOTE: THIS ASSUMES THE CURVE NUMBER RASTER IS IN METERS
+    storage = 0.1 * ((25400.0 / avg_cn) - 254.0)
+    
+    # inital abstraction, amount of precip that never has a chance to become runoff
+    init_abstraction = 0.2 * storage 
+    
+    # -------------------------------------------
+    # RUNOFF DEPTH 
+    
+    # calculate depth of runoff from each storm
+    # if P < Ia NO runoff is produced
+    Pe = (rainfall_cm - init_abstraction)
+    if Pe < 0:
+        return None
+
+    Q = (Pe**2) / (rainfall_cm + (storage - init_abstraction))
+    
+    # -------------------------------------------
+    # RAIN RATIO AND PEAK FLOW
+
+    # calculate q_peak, cubic meters per second
+    # q_u is an adjustment because these watersheds are very small. It is a function of tc,
+    # and constants Const0, Const1, and Const2 which are in turn functions of Ia/P (rain_ratio) and rainfall type
+    # We are using rainfall Type II because that is applicable to most of New York State
+    # rain_ratio is a vector with one element per input return period
+    rain_ratio = init_abstraction / P
+    rain_ratio = [.1 if i < .1 else .5 if i > .5 else i for i in [rain_ratio]][0] # keep rain ratio within limits set by TR55
+    
+    CONST_0 = (rain_ratio**2) * -2.2349 + (rain_ratio * 0.4759) + 2.5273
+    CONST_1 = (rain_ratio**2) * 1.5555 - (rain_ratio * 0.7081) - 0.5584
+    CONST_2 = (rain_ratio**2) * 0.6041 + (rain_ratio * 0.0437) - 0.1761
+
+    # qu has weird units which take care of the difference between Q in cm and area in km2 
+    # qu is in m^3 s^-1 km^-2 cm^-1
+    qu = 10 ** (CONST_0 + CONST_1 * numpy.log10(tc_hr) + CONST_2 *  (numpy.log10(tc_hr))**2 - 2.366)
+    q_peak = Q * qu * catchment_area_sqkm # m^3 s^-1
+    
+    return q_peak
