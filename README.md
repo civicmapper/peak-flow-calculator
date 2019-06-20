@@ -17,40 +17,41 @@ This toolbox relies on:
 * the [ArcPy](https://pro.arcgis.com/en/pro-app/arcpy/get-started/what-is-arcpy-.htm) package in ArcGIS Pro
 * [PETL](https://petl.readthedocs.io/en/stable/), a package for easily building data extract/transform/load workflows
 * [Pint](https://pint.readthedocs.io), a package for working with units
+* [Click](https://click.palletsprojects.com/en/7.x/), a package that helps provide a CLI for these tools
+* [pytest](https://docs.pytest.org/en/latest/), for testing
 
-As ArcGIS Pro is Windows-only software, this works only on Windows (though a platform-agnostic, non Esri version may be developed in the future).
+As ArcGIS Pro is Windows-only software, this works only on Windows (see **Plans**, near the end of this Read Me)
 
-To install, create an environment and install all dependencies from the `environment.yml` file:
+There are a few ways to install. If you're unfamilar with Python Conda environments and plan on using this stricly within ArcGIS Pro, then start here:
 
-`conda env create -f environment.yml`
+### Installation with ArcGIS Pro
 
-Then activate the environment:
+Download (or clone) the contents of this repository to your computer.
 
-`activate peakflowcalc`
+First, [start with these instructions for creating and activating an environment](https://pro.arcgis.com/en/pro-app/arcpy/get-started/what-is-conda.htm#ESRI_SECTION2_61E4CFA5BAC144659038854CADEFC625) on Esri's help site.
 
-### Alt. method: clone an Existing ArcGIS Pro Conda Environment and install dependendencies from `spec-file`
+Then, move on to the instructions for [installing available packages](https://pro.arcgis.com/en/pro-app/arcpy/get-started/what-is-conda.htm#ESRI_SECTION2_85BC919097434B3B9AE1A746D793AA29).
 
-Use the `conda` executable in your existing ArcGIS Pro Anaconda environment to clone the ArcGIS Pro Anaconda installation.
+Following those instructions, you'll need to install four packages:
 
-`"%PROGRAMFILES%\ArcGIS\Pro\bin\Python\Scripts\conda.exe" create --name peakflowcalc --clone "%PROGRAMFILES%\ArcGIS\Pro\bin\Python\envs\arcgispro-py3"`
+* PETL
+* Pint
+* Click
+* pytest
 
-Note that the above command assumes a per machine (all users) installation of ArcGIS Pro. If ArcGIS Pro has been installed for the current user, substitute `%LOCALAPPDATA%` for `%PROGRAMFILES%`. `%LOCALAPPDATA%` is typically at `C:\Users\<username>\AppData\Local`
+Once those are installed, make sure your new environment is active. You will likely need to restart ArcGIS Pro.
 
-Regardless, this will create an environment at `%LOCALAPPDATA%/ESRI/conda/envs/peakflowcalc/python`
+### Installation when you hanlde Conda yourself outside of ArcGIS Pro
 
-Then install all dependencies from the `spec-file`:
+(skip this if you installed per the instructions in the previous section)
 
-`conda install --name peakflowcalc --file spec-file.txt`
+* create a new Conda environment from the command line
+* install packages from the included `requirements.txt` file to the environment.
+* activate the environment in ArcGIS Pro
 
-The `spec-file` is architecture-specific. YMMV.
+### Loading the toolbox
 
-Then activate the environment:
-
-`activate peakflowcalc`
-
-That *may* activate the environment...but it might not. If you have a stand-alone Anaconda installation, you may encounter an error: `Could not find conda environment: peakflowcalc`--the stand-alone installation's environment list is not shared with the ArcGIS Pro environment list (or something like that). In that case try to run:
-
-`activate %LOCALAPPDATA%/\ESRI\conda\envs\peakflowcalc`
+In your ArcGIS Pro project connect to a toolbox (follow [these instructions](https://pro.arcgis.com/en/pro-app/help/projects/connect-to-a-toolbox.htm) if you haven't done it before).
 
 ## Usage
 
@@ -66,7 +67,7 @@ From these, it calculates peak flow for every input point, cubic meters/second.
 
 ### Via ArcGIS Pro
 
-An ArcToolbox is provided for running these scripts in ArcGIS Pro, `PeakFlow.tbx`. 
+An ArcToolbox is provided for running these scripts in ArcGIS Pro, `PeakFlow.tbx`.
 
 Two scripts are used to build and/or prep a curve number raster, which is a prerequisite for running the tool.
 
@@ -75,13 +76,15 @@ Two scripts are used to build and/or prep a curve number raster, which is a prer
 
 Three scripts run the Peak Flow Calculator:
 
-* *Peak Flow Calculator*: the basic implementation of the peak flow calculator logic.
+* *Peak Flow Calculator*: the basic implementation of the peak flow calculator logic
 * *Peak Flow Calculator - Interactive*: allows for pour points to be added interactively on the map, instead of from an existing layer
-* *Peak Flow Calculator using Pre-Calc'd Basins*: same as the basic implementation, but allows the user to additionally provide a watershed basin raster as input.
+* *Peak Flow Calculator using Pre-Calc'd Basins*: same as the basic implementation, but allows the user to additionally provide a watershed basin raster as input
 
 ### Via CLI
 
-The CLI uses Python Click. *Currently*, the CLI exposes a few, slightly different versions of the tools described above:
+You can run the toolbox outside of ArcGIS Pro from the command line, as long as ArcGIS Pro is installed/licensed on your machine.
+
+*Currently*, the CLI exposes a few, slightly different versions of the tools described above:
 
 * *Peak-Flow Calculator "Lite"*. Same as the basic implementation available in ArcToolbox tool above.
 * *Peak-Flow Calculator "Full"*: an implementation of the peak flow calculator logic that automatically calculates flow direction and slope inputs from a DEM at run-time.
@@ -98,6 +101,12 @@ Available commands will likely coorespond with available ArcToolbox tools in fut
 * `core/logic/gp.py` contains all functions that perform geoprocessing using the ArcPy package, including reading and writing spatial datasets
 * `core/logic/utils.py` contains utilty functions.
 
+See the wiki for more information on the business logic.
+
+## Plans
+
+* We plan to develop a platform-agnostic version of this toolset that is not dependent on Esri licensing in the future.
+
 ## Credits/Contributors
 
 * These scripts are based on the culvert evaluation model developed by Rebecca Marjerison at the Cornell Soil and Water Lab in 2013
@@ -106,5 +115,4 @@ Available commands will likely coorespond with available ArcToolbox tools in fut
 * Updated by Zoya Kaufmann June 2016 - August 2017
 * Merged with older versions by Tanvi Naidu June 19 2017
 * Fork, refactor, and creation of CLI and ArcMap interfaces by Christian Gass @ CivicMapper, Fall 2017
-* Updates for use within ArcGIS Pro by Christian Gass @ CivicMapper, Spring 2019
-
+* Updates for use within ArcGIS Pro by Christian Gass @ CivicMapper, Spring/Summer 2019
