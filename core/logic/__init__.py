@@ -72,7 +72,7 @@ import pint
 units = pint.UnitRegistry()
 
 QP_HEADER = ['Y1','Y2','Y5','Y10','Y25','Y50','Y100','Y200','Y500','Y1000']
-ANALYSIS_FIELDS = ['avg_slope', 'avg_cn', 'tc_hr', 'area_up', 'max_fl']
+ANALYSIS_FIELDS = ['area_up', 'avg_slope', 'max_fl', 'avg_cn', 'tc_hr']
 OUTPUT_FIELDS = QP_HEADER + ANALYSIS_FIELDS
 
 # -----------------------------------------------------------------------------
@@ -216,6 +216,7 @@ def main(
     # area, maximum flow length, average slope, average curve number
 
     msg('Deriving calculation parameters for catchments...', set_progressor_label=True)
+    
     catchment_data, catchment_geom = derive_data_from_catchments(
         catchment_areas=catchment_areas,
         flow_direction_raster=flow_dir_raster,
@@ -364,16 +365,22 @@ def additional_run(
     """
 
     precip_table = precip_table_etl_noaa(another_noaa_precip_table)
+    print(precip_table)
 
+    # read the data in from the CSV. Since it's coming in from CSV we need 
+    # to explicity convert our number fields to numbers
     r = etl\
         .fromcsv(results_table_csv)\
         .convert({f:float for f in OUTPUT_FIELDS})
-
+    
+    # if the input results table units are imperial, convert them to metric here
+    # (the TR55 equations are written for metric units)
     if uses_imperial:
         r = etl\
             .convert(r, 'max_fl', lambda v: (v * units.feet).to(units.meter).magnitude)\
             .convert('area_up', lambda v: (v * (units.acre)).to(units.kilometer ** 2).magnitude)
 
+    # a function to run the peak flow calculation on each row in the table.
     def rowmapper(row):
 
         result = calculate_peak_flow(
@@ -388,19 +395,26 @@ def additional_run(
 
     out_fields = [i for i in OUTPUT_FIELDS]
     out_fields.append(pour_point_id_field)
+    # print(out_fields)
 
+    # run the preak flow calculation on the table
     r2 = etl\
         .rowmap(r, rowmapper, header=out_fields, failonerror=True)\
         .convert({f:float for f in QP_HEADER})\
         .convert({f:float for f in ANALYSIS_FIELDS})\
         .cut(*out_fields)
-
+    # print("after calc", r2)
+    # if the input results table units are imperial, then convert the metric results
+    # of the peak flow calculator back to imperial here, specifically the new peak flow rates.
     if uses_imperial:
-        r2 = etl.convert(
-            r2,
-            {i: lambda v: (v * units.meter ** 3 / units.second).to(units.feet ** 3 / units.second).magnitude for i in QP_HEADER}
-        )
+        r2 = etl\
+            .convert(r2, {i: lambda v: (v * units.meter ** 3 / units.second).to(units.feet ** 3 / units.second).magnitude for i in QP_HEADER})\
+            .convert('max_fl', lambda v: (v * units.meter).to(units.feet).magnitude)\
+            .convert('area_up', lambda v: (v * (units.kilometer ** 2)).to(units.acre).magnitude)
 
+    print("after convert", r2)
+
+    # save out to a new csv
     if out_csv:
         etl.tocsv(r2, out_csv)
 
