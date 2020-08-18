@@ -116,3 +116,4 @@ See the wiki for more information on the business logic.
 * Merged with older versions by Tanvi Naidu June 19 2017
 * Fork, refactor, and creation of CLI and ArcMap interfaces by Christian Gass @ CivicMapper, Fall 2017
 * Updates for use within ArcGIS Pro by Christian Gass @ CivicMapper, Spring/Summer 2019
+* Additional updates by Tal Cohen 2020
