@@ -63,7 +63,7 @@ The Peak Flow calculator takes several inputs:
 * a raster indicating curve numbers calculated according the the TR-55 method. *At this time the curve number raster must use a CRS with meters for units.*
 * a preciptation frequency estimates table from NOAA (`/sample_data/noaa_precip_table.csv` for the duration and frequencies expected by this tool)
 
-From these, it calculates peak flow for every input point, cubic meters/second.
+From these, it calculates peak flow for every input point. Peak flow results are reported in cubic feet/second for every storm frequency from 1 to 1000 year storm.
 
 ### Via ArcGIS Pro
 
